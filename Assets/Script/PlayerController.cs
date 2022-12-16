@@ -11,7 +11,8 @@ public class PlayerController : KCCPlayer
     MeshRenderer meshRenderer;
     [SerializeField]
     float moveSpeed = 15f;
-
+    [SerializeField]
+    float rotateSpeed = 3f;
     [SerializeField]
     Bullet bulletPrefab;
 
@@ -75,27 +76,32 @@ public class PlayerController : KCCPlayer
 
             if (!moveVector.IsAlmostZero())
             {
-                Vector2 lookRotation = KCC.FixedData.GetLookRotation(true, true);
-                var aAngle = Mathf.Atan2(moveVector.x, moveVector.z) * Mathf.Rad2Deg;
-                aAngle -= transform.eulerAngles.y;
+                var aMoveAngle = Mathf.Atan2(moveVector.x, moveVector.z) * Mathf.Rad2Deg;
 
-                if (moveVector.y < 0)
-                {
-                    aAngle = 180f - aAngle;
-                }
-                else // fix the aAngle for 4th quadrant:
-                if (moveVector.x < 0)
-                {
-                    aAngle = 360f + aAngle;
-                }
+                while (aMoveAngle < 0f)
+                    aMoveAngle += 360f;
+                while (aMoveAngle > 360f)
+                    aMoveAngle -= 360f;
 
+                // 305 - 45 = 260
+                // - 45 - 45 = -90
 
-                Vector2 lookRotationDelta = KCCUtility.GetClampedLookRotationDelta(lookRotation, new Vector2(1f, aAngle), -MaxCameraAngle, MaxCameraAngle);
-                KCC.AddLookRotation(lookRotationDelta);
+                float aMoveAngle1 = aMoveAngle - transform.eulerAngles.y;
+                float aMoveAngle2 = aMoveAngle - 360f - transform.eulerAngles.y;
+
+                float aDeltaAngle;
+                if (Mathf.Abs(aMoveAngle1) > Mathf.Abs(aMoveAngle2))
+                    aDeltaAngle = aMoveAngle2;
+                else
+                    aDeltaAngle = aMoveAngle1;
+
+                aDeltaAngle = Mathf.Lerp(0, aDeltaAngle, Runner.DeltaTime * rotateSpeed);
+
+                KCC.AddLookRotation(new Vector2(1f, aDeltaAngle));
             }
 
             // networkCharacterController.Move(moveSpeed * moveVector * Runner.DeltaTime);
-            KCC.SetInputDirection(moveVector);
+            KCC.SetInputDirection(moveVector * moveSpeed);
 
             if (pressed.IsSet(InputButtons.Jump))
             {
