@@ -184,10 +184,9 @@ GameObject:
   m_Component:
   - component: {fileID: 3721102486629758618}
   - component: {fileID: 3721102486629758617}
-  - component: {fileID: 3721102486629758616}
-  - component: {fileID: 3721102486629758615}
+  - component: {fileID: 4178141062034591209}
   - component: {fileID: 6245414457267202862}
-  - component: {fileID: 1806374165711266914}
+  - component: {fileID: 8409518488662100142}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -233,63 +232,25 @@ MonoBehaviour:
     RawGuidValue: d437a8070269fbc4791acf9bfadfcdc5
   NestedObjects: []
   NetworkedBehaviours:
-  - {fileID: 3721102486629758615}
   - {fileID: 6245414457267202862}
+  - {fileID: 8409518488662100142}
   SimulationBehaviours: []
---- !u!143 &3721102486629758616
-CharacterController:
+--- !u!54 &4178141062034591209
+Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3721102486629758614}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
   serializedVersion: 2
-  m_Height: 2
-  m_Radius: 0.5
-  m_SlopeLimit: 45
-  m_StepOffset: 0.3
-  m_SkinWidth: 0.08
-  m_MinMoveDistance: 0.001
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &3721102486629758615
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3721102486629758614}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 378411a89480da345945c2f888327a2d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _interpolationDataSource: 0
-  InterpolationSpace: 0
-  InterpolationTarget: {fileID: 3721102487593955127}
-  InterpolateErrorCorrection: 1
-  InterpolatedErrorCorrectionSettings:
-    MinRate: 3.3
-    MaxRate: 10
-    PosBlendStart: 0.25
-    PosBlendEnd: 1
-    PosMinCorrection: 0.025
-    PosTeleportDistance: 2
-    RotBlendStart: 0.1
-    RotBlendEnd: 0.5
-    RotTeleportRadians: 1.5
-  UseLegacySharedModeInterpolation: 0
-  TargetInterpolationDelay: 0.03
-  gravity: -20
-  jumpImpulse: 8
-  acceleration: 10
-  braking: 10
-  maxSpeed: 15
-  rotationSpeed: 15
-  _IsGrounded: 0
-  _Velocity: {x: 0, y: 0, z: 0}
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 126
+  m_CollisionDetection: 0
 --- !u!114 &6245414457267202862
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -303,28 +264,67 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _interpolationDataSource: 0
+  _areaOfInterestRadius: 0
+  _maxCameraAngle: 180
+  _jumpImpulse: {x: 0, y: 0, z: 0}
+  _SpeedMultiplier: 1
   meshRenderer: {fileID: 3721102487593955129}
-  networkCharacterController: {fileID: 3721102486629758615}
   moveSpeed: 15
   bulletPrefab: {fileID: 3847043803761444823, guid: 4a201d7a4c49c484dbea04570b4bd6e3,
     type: 3}
   hpBar: {fileID: 8281634557835661241}
   maxHp: 100
   _Hp: 0
---- !u!136 &1806374165711266914
-CapsuleCollider:
+--- !u!114 &8409518488662100142
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3721102486629758614}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
   m_Enabled: 1
-  m_Radius: 0.5
-  m_Height: 1
-  m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f7684f04e649e84fb2ee1bc9fbee42d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _interpolationDataSource: 3
+  _settings:
+    Shape: 1
+    IsTrigger: 0
+    Radius: 0.5
+    Height: 2
+    Extent: 0.035
+    Mass: 1
+    ColliderLayer: 0
+    CollisionLayerMask:
+      serializedVersion: 2
+      m_Bits: 1
+    RenderBehavior: 1
+    Features: -1
+    SuppressConvexMeshColliders: 0
+    SpawnColliderOnProxy: 1
+    AllowClientTeleports: 0
+    TeleportThreshold: 1
+    CCDRadiusMultiplier: 0.75
+    AntiJitterDistance: {x: 0, y: 0}
+    GroundSnapDistance: 0.25
+    GroundSnapSpeed: 4
+    StepHeight: 0.3
+    StepSpeed: 1
+    Processors:
+    - {fileID: 6733955975318150615, guid: 0b1fae6ab34a6e0478cb92d6e1a62e44, type: 3}
+    - {fileID: -3592675505127058418, guid: 93e6d39666b21fe4ea884554d8526c00, type: 3}
+    PositionAccuracy:
+      _value: 0.0001
+      _inverse: 0
+      _hash: -194233199
+    RotationAccuracy:
+      _value: 0.0001
+      _inverse: 0
+      _hash: -258202764
+    MaxNetworkedCollisions: 4
+    MaxNetworkedModifiers: 4
+    MaxNetworkedIgnores: 4
 --- !u!1 &3721102487593955126
 GameObject:
   m_ObjectHideFlags: 0
@@ -351,7 +351,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3721102487593955126}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.002, z: 0}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

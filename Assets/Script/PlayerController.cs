@@ -3,16 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using Fusion;
 using UnityEngine.UI;
+using Fusion.KCC;
 
-public class PlayerController : NetworkBehaviour
+public class PlayerController : KCCPlayer
 {
     [SerializeField]
     MeshRenderer meshRenderer;
-
-
-    [SerializeField]
-    NetworkCharacterControllerPrototype networkCharacterController = null;
-
     [SerializeField]
     float moveSpeed = 15f;
 
@@ -65,22 +61,57 @@ public class PlayerController : NetworkBehaviour
         meshRenderer.material.color = newColor;
     }
 
-
-
     public override void FixedUpdateNetwork()
     {
+        base.FixedUpdateNetwork();
+
         if (GetInput(out NetworkInputData data))
         {
             NetworkButtons buttons = data.buttons;
 
             var pressed = buttons.GetPressed(ButtonsPrevious);
             ButtonsPrevious = buttons;
-
             Vector3 moveVector = data.movementInput.normalized;
-            networkCharacterController.Move(moveSpeed * moveVector * Runner.DeltaTime);
+
+            if (!moveVector.IsAlmostZero())
+            {
+                Vector2 lookRotation = KCC.FixedData.GetLookRotation(true, true);
+                var aAngle = Mathf.Atan2(moveVector.x, moveVector.z) * Mathf.Rad2Deg;
+                aAngle -= transform.eulerAngles.y;
+
+                if (moveVector.y < 0)
+                {
+                    aAngle = 180f - aAngle;
+                }
+                else // fix the aAngle for 4th quadrant:
+                if (moveVector.x < 0)
+                {
+                    aAngle = 360f + aAngle;
+                }
+
+
+                Vector2 lookRotationDelta = KCCUtility.GetClampedLookRotationDelta(lookRotation, new Vector2(1f, aAngle), -MaxCameraAngle, MaxCameraAngle);
+                KCC.AddLookRotation(lookRotationDelta);
+            }
+
+            // networkCharacterController.Move(moveSpeed * moveVector * Runner.DeltaTime);
+            KCC.SetInputDirection(moveVector);
 
             if (pressed.IsSet(InputButtons.Jump))
-                networkCharacterController.Jump();
+            {
+                // By default the character jumps forward in facing direction
+                Quaternion jumpRotation = KCC.FixedData.TransformRotation;
+
+                // If we are moving, jump in that direction instead
+                if (!moveVector.IsAlmostZero())
+                {
+                    jumpRotation = Quaternion.LookRotation(moveVector);
+                }
+
+                // Applying jump impulse
+                KCC.Jump(jumpRotation * JumpImpulse);
+            }
+
             if (pressed.IsSet(InputButtons.Fire))
             {
                 Runner.Spawn(bulletPrefab, transform.position + transform.TransformDirection(Vector3.forward),
