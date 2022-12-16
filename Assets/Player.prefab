@@ -266,7 +266,7 @@ MonoBehaviour:
   _interpolationDataSource: 0
   _areaOfInterestRadius: 0
   _maxCameraAngle: 180
-  _jumpImpulse: {x: 0, y: 0, z: 0}
+  _jumpImpulse: {x: 0, y: 8, z: 0}
   _SpeedMultiplier: 1
   meshRenderer: {fileID: 3721102487593955129}
   moveSpeed: 15

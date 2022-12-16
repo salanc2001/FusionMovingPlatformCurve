@@ -370,14 +370,20 @@ namespace Fusion.KCC
         /// </summary>
         public void Jump(Vector3 impulse)
         {
+            UnityEngine.Debug.Log($"<color=yellow>Jump:{impulse}</color>");
+
             if (HasAnyAuthority == false)
                 return;
 
+            UnityEngine.Debug.Log($"<color=yellow>2</color>");
+
             _renderData.JumpImpulse += impulse;
 
+            UnityEngine.Debug.Log($"<color=orange>_renderData:{_renderData.JumpImpulse}</color>");
             if (IsInFixedUpdate == true)
             {
                 _fixedData.JumpImpulse += impulse;
+                UnityEngine.Debug.Log($"<color=red>_fixedData:{_fixedData.JumpImpulse}</color>");
             }
         }
 
