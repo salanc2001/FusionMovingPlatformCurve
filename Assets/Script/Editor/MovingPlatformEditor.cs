@@ -1,4 +1,5 @@
 
+using System.Collections.Generic;
 using com.spacepuppy.Geom;
 using Fusion.KCC;
 using UnityEditor;
@@ -35,15 +36,25 @@ public class MovingPlatformEditor : Editor
         {
             mCatmullRomSpline.AddControlPoint(WayPoints[i]);
         }
+        List<Vector3> aSpline = new List<Vector3>();
+        for (float i = 0; i <= 1f; i += 0.05f)
+        {
+            aSpline.Add(mCatmullRomSpline.GetPosition(i));
+        }
+
+        mSpline = aSpline.ToArray();
     }
+
+    Vector3[] mSpline;
 
     public void OnSceneGUI()
     {
         Handles.color = Color.yellow;
-        for (float i = 0; i <= 1f; i += 0.05f)
+        for (int i = 0; i < mSpline.Length - 1; i++)
         {
-            Handles.DrawLine(mCatmullRomSpline.GetPosition(i), mCatmullRomSpline.GetPosition(i + 0.05f), 4);
+            Handles.DrawLine(mSpline[i], mSpline[i + 1], 4);
         }
+        Handles.DrawLine(mSpline[mSpline.Length - 1], mSpline[0], 4);
 
         if (Application.isPlaying)
             return;
