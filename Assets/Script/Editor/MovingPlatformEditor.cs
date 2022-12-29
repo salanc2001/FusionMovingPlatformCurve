@@ -21,6 +21,14 @@ public class MovingPlatformEditor : Editor
         {
             UseConstantSpeed = true
         };
+
+        UpdateSpline();
+    }
+
+    void UpdateSpline()
+    {
+        mCatmullRomSpline.ClearPoint();
+
         Vector3[] WayPoints = mMovingPlatform.GenerateCurvePath(mMovingPlatform.GetWayPoints());
 
         for (int i = 0; i < WayPoints.Length; ++i)
@@ -35,6 +43,18 @@ public class MovingPlatformEditor : Editor
         for (float i = 0; i <= 1f; i += 0.05f)
         {
             Handles.DrawLine(mCatmullRomSpline.GetPosition(i), mCatmullRomSpline.GetPosition(i + 0.05f), 4);
+        }
+
+        if (Application.isPlaying)
+            return;
+
+        Transform[] WayTransforms = mMovingPlatform.GetWayTransforms();
+        for (int i = 0; i < WayTransforms.Length; i++)
+        {
+            EditorGUI.BeginChangeCheck();
+            WayTransforms[i].position = Handles.PositionHandle(WayTransforms[i].position, Quaternion.identity);
+            if (EditorGUI.EndChangeCheck())
+                UpdateSpline();
         }
     }
 }

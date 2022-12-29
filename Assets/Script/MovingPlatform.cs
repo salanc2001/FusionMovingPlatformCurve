@@ -223,6 +223,11 @@ namespace Fusion.KCC
             ApplyPositionDelta(positionDelta, 0f);
         }
 
+        public Transform[] GetWayTransforms()
+        {
+            return _waypoints.Select(x => x.Transform).ToArray();
+        }
+
         public Vector3[] GetWayPoints()
         {
             return _waypoints.Select(x => x.Transform.position).ToArray();

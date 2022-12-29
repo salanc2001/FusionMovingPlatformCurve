@@ -10,7 +10,7 @@ namespace com.spacepuppy.Geom
 
         #region Fields
 
-        private const int SUBDIVISIONS_MULTIPLIER = 32;
+        private const int SUBDIVISIONS_MULTIPLIER = 20;
 
         private List<Vector3> _points = new List<Vector3>();
         private bool _useConstantSpeed = true;
@@ -146,6 +146,11 @@ namespace com.spacepuppy.Geom
         public void RemoveControlPoint(int index)
         {
             _points.RemoveAt(index);
+        }
+
+        public void ClearPoint()
+        {
+            _points.Clear();
         }
 
         public float GetPathLength()
