@@ -1,9 +1,14 @@
-namespace Example
+using UnityEditor;
+
+namespace Fusion.KCC
 {
     using System;
     using UnityEngine;
     using Fusion;
     using Fusion.KCC;
+    using System.Linq;
+    using com.spacepuppy.Geom;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Basic platform which moves the object between waypoints and propagates transform changes to all KCCs within snap volume.
@@ -37,7 +42,10 @@ namespace Example
         private int _direction { get; set; }
         [Networked]
         private float _waitTime { get; set; }
-
+        [Networked]
+        private float _rotationDelta { get; set; }
+        [Networked]
+        float mAngle { get; set; }
         private Transform _transform;
         private Rigidbody _rigidbody;
         private float _renderTime;
@@ -45,7 +53,6 @@ namespace Example
         private int _renderDirection;
         private Vector3 _renderPosition;
         private RawInterpolator _entitiesInterpolator;
-
         public override int PositionWordOffset => 0;
 
         public override void Spawned()
@@ -59,6 +66,60 @@ namespace Example
             _renderWaypoint = _waypoint;
             _renderDirection = _direction;
             _entitiesInterpolator = GetInterpolator(nameof(_entities));
+
+            HandleCurvePoints();
+        }
+
+        void HandleCurvePoints()
+        {
+            if (_mode != EPlatformMode.Curve)
+                return;
+
+            List<PlatformWaypoint> points = new List<PlatformWaypoint>();
+            _curvePath = GenerateCurvePath(GetWayPoints());
+            for (int i = 0; i < _curvePath.Length; i++)
+                mCatmullRomSpline.AddControlPoint(_curvePath[i]);
+
+
+            int aInterval = 20;
+            float aIntervalTime = mCatmullRomSpline.GetPathLength() / _speed / aInterval;
+
+            for (int i = 0; i < aInterval; i++)
+            {
+                Transform aT = new GameObject().transform;
+                aT.gameObject.name = $"CurvePath{i}";
+                aT.SetParent(transform.parent);
+                aT.position = mCatmullRomSpline.GetPosition((float)i / aInterval);
+                Vector3 aAngleVelocity = Vector3.zero;
+                if (i != 0)
+                {
+                    Vector3 aDelta = aT.position - points[i - 1].Transform.position;
+                    float aAngle = Mathf.Atan2(aDelta.x, aDelta.z) * Mathf.Rad2Deg;
+                    aT.eulerAngles = new Vector3(transform.eulerAngles.x, aAngle, transform.eulerAngles.z);
+                    float aAngleDelta = Mathf.DeltaAngle(points[i - 1].Transform.eulerAngles.y, aT.eulerAngles.y);
+                    aAngleVelocity = new Vector3(0f, aAngleDelta / aIntervalTime, 0f);
+                }
+                else
+                    aT.eulerAngles = transform.eulerAngles;
+
+                points.Add(new PlatformWaypoint
+                {
+                    Transform = aT,
+                    WaitTime = 0,
+                    AngleVelocity = aAngleVelocity
+                });
+
+                if (i == 0)
+                {
+                    points[0].WaitTime = _waypoints[0].WaitTime;
+                }
+            }
+
+            float aAngleDelta2 = Mathf.DeltaAngle(points[points.Count - 1].Transform.eulerAngles.y, points[0].Transform.eulerAngles.y);
+            var aAngleVelocity2 = new Vector3(0f, aAngleDelta2 / aIntervalTime, 0f);
+            points[0].AngleVelocity = aAngleVelocity2;
+
+            _waypoints = points.ToArray();
         }
 
         public override void FixedUpdateNetwork()
@@ -73,6 +134,30 @@ namespace Example
             {
                 // Calculate next position of the platform.
                 CalculateNextPosition(_waypoint, _direction, _position, Runner.DeltaTime, out int nextWaypoint, out int nextDirection, out positionDelta, out float waitTime);
+
+                if (_mode == EPlatformMode.Curve)
+                {
+
+                    if (Object.HasStateAuthority)
+                    {
+                        if (_waitTime > 0.0f)
+                            transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+                        else if (_waypoint != nextWaypoint)
+                            transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+                        else
+                            transform.eulerAngles += _waypoints[_waypoint].AngleVelocity * Runner.DeltaTime;
+
+                        _rotationDelta = _waypoints[_waypoint].AngleVelocity.y * Runner.DeltaTime;
+                        mAngle = transform.eulerAngles.y;
+                    }
+                    else
+                    {
+                        Vector3 aAngle = transform.eulerAngles;
+                        aAngle.y = mAngle;
+                        transform.eulerAngles = aAngle;
+                    }
+                }
+
 
                 _position += positionDelta;
                 _waypoint = nextWaypoint;
@@ -113,7 +198,7 @@ namespace Example
                 }
             }
 
-            ApplyPositionDelta(positionDelta);
+            ApplyPositionDelta(positionDelta, _rotationDelta);
         }
 
         public override void Render()
@@ -126,9 +211,7 @@ namespace Example
 
             // Calculate next render position of the platform.
             // We always have to calculate delta against previous render frame to avoid clearing render changes from other sources.
-
             CalculateNextPosition(_renderWaypoint, _renderDirection, _renderPosition, deltaTime, out int nextWaypoint, out int nextDirection, out Vector3 positionDelta, out float waitTime);
-
             _renderTime = renderTime;
             _renderPosition += positionDelta;
             _renderWaypoint = nextWaypoint;
@@ -137,7 +220,12 @@ namespace Example
             _transform.position = _renderPosition;
             _rigidbody.position = _renderPosition;
 
-            ApplyPositionDelta(positionDelta);
+            ApplyPositionDelta(positionDelta, 0f);
+        }
+
+        public Vector3[] GetWayPoints()
+        {
+            return _waypoints.Select(x => x.Transform.position).ToArray();
         }
 
         // MonoBehaviour INTERFACE
@@ -296,7 +384,7 @@ namespace Example
                         if (nextWaypoint >= _waypoints.Length)
                             break;
                     }
-                    else if (_mode == EPlatformMode.Looping)
+                    else if (_mode == EPlatformMode.Looping || _mode == EPlatformMode.Curve)
                     {
                         ++nextWaypoint;
                         nextWaypoint %= _waypoints.Length;
@@ -386,7 +474,7 @@ namespace Example
             return length > 0.001f ? Mathf.Clamp01(distance / length) : 1.0f;
         }
 
-        private void ApplyPositionDelta(Vector3 positionDelta)
+        private void ApplyPositionDelta(Vector3 positionDelta, float rotationDelta)
         {
             if (positionDelta.IsZero() == true)
                 return;
@@ -411,8 +499,15 @@ namespace Example
                             continue;
                         }
 
+                        if (_mode == EPlatformMode.Curve && !rotationDelta.IsAlmostZero())
+                        {
+                            var aCurvePos = GetDeltaPosition(kcc.Data.BasePosition, rotationDelta);
+                            positionDelta = aCurvePos + positionDelta;
+                        }
+
                         KCCData kccData = kcc.Data;
                         Vector3 targetPosition = kccData.TargetPosition + positionDelta;
+
 
                         if (_snapVolume.ClosestPoint(targetPosition).AlmostEquals(targetPosition) == true)
                         {
@@ -430,6 +525,58 @@ namespace Example
             }
         }
 
+        Vector3 RotateAroundPoint(Vector3 point, Vector3 pivot, Quaternion angle)
+        {
+            var finalPos = point - pivot;
+            //Center the point around the origin
+            finalPos = angle * finalPos;
+            //Rotate the point.
+            finalPos += pivot;
+            //Move the point back to its original offset. 
+            return finalPos;
+        }
+
+        Vector3 GetDeltaPosition(Vector3 child, float rotationDelta)
+        {
+            Vector3 aChildDestPos = RotateAroundPoint(child, _position, Quaternion.Euler(0f, rotationDelta, 0f));
+            return aChildDestPos - child;
+        }
+
+        Vector3[] _curvePath = null;
+        float _curveTime = 0f;
+        float _curveTotalTime = 0f;
+
+        CatmullRomSpline mCatmullRomSpline = new CatmullRomSpline
+        {
+            UseConstantSpeed = true
+        };
+
+        public Vector3[] GenerateCurvePath(Vector3[] iWayPoints)
+        {
+            //build calculated path:
+            Vector3[] aResult = new Vector3[iWayPoints.Length + 2];
+            //populate calculate path;
+            Array.Copy(iWayPoints, 0, aResult, 1, iWayPoints.Length);
+
+            //populate start and end control points:
+            //vector3s[0] = vector3s[1] - vector3s[2];
+            aResult[0] = aResult[1] + (aResult[1] - aResult[2]);
+            aResult[aResult.Length - 1] = aResult[aResult.Length - 2] + (aResult[aResult.Length - 2] - aResult[aResult.Length - 3]);
+
+            //is this a closed, continuous loop? yes? well then so let's make a continuous Catmull-Rom spline!
+            if (aResult[1] == aResult[aResult.Length - 2])
+            {
+                Vector3[] tmpLoopSpline = new Vector3[aResult.Length];
+                Array.Copy(aResult, tmpLoopSpline, aResult.Length);
+                tmpLoopSpline[0] = tmpLoopSpline[tmpLoopSpline.Length - 3];
+                tmpLoopSpline[tmpLoopSpline.Length - 1] = tmpLoopSpline[2];
+                aResult = new Vector3[tmpLoopSpline.Length];
+                Array.Copy(tmpLoopSpline, aResult, tmpLoopSpline.Length);
+            }
+
+            return aResult;
+        }
+
         // DATA STRUCTURES
 
         [Serializable]
@@ -437,6 +584,7 @@ namespace Example
         {
             public Transform Transform;
             public float WaitTime;
+            public Vector3 AngleVelocity;
         }
 
         private struct PlatformEntity : INetworkStruct
@@ -451,6 +599,10 @@ namespace Example
             None = 0,
             Looping = 1,
             PingPong = 2,
+            Curve = 3
         }
     }
+
+
+
 }

@@ -50,7 +50,6 @@ public abstract class KCCPlayer : NetworkKCCProcessor
 
     public override void Spawned()
     {
-        Debug.Log("<color=red> _kcc.Initialize</color>");
         // Explicit KCC initialization. This needs to be called before using API, otherwise changes could be overriden by implicit initialization from KCC.Start() or KCC.Spawned()
         _kcc.Initialize(EKCCDriver.Fusion);
 
