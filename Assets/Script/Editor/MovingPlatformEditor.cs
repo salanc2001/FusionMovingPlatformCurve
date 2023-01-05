@@ -10,14 +10,14 @@ using UnityEngine;
 public class MovingPlatformEditor : Editor
 {
 
-    MovingPlatform mMovingPlatform;
+    MovingPlatform me;
     CatmullRomSpline mCatmullRomSpline;
 
     Vector3[] mCurve = null;
 
     private void OnEnable()
     {
-        mMovingPlatform = target as MovingPlatform;
+        me = target as MovingPlatform;
         mCatmullRomSpline = new CatmullRomSpline
         {
             UseConstantSpeed = true
@@ -30,7 +30,7 @@ public class MovingPlatformEditor : Editor
     {
         mCatmullRomSpline.ClearPoint();
 
-        Vector3[] WayPoints = mMovingPlatform.GenerateCurvePath(mMovingPlatform.GetWayPoints());
+        Vector3[] WayPoints = me.GenerateCurvePath(me.GetWayPoints());
 
         for (int i = 0; i < WayPoints.Length; ++i)
         {
@@ -56,10 +56,20 @@ public class MovingPlatformEditor : Editor
         }
         Handles.DrawLine(mSpline[mSpline.Length - 1], mSpline[0], 4);
 
+        MovingPlatform.AdjustFocus[] aFocus = me.GetAdjustFocus();
+
+        foreach (var f in aFocus)
+        {
+            Handles.color = Color.cyan;
+            Handles.DrawLine(f.mTargetPos, f.mTargetPos + f.mDeltaPos * 1000, 4);
+            Handles.color = Color.green;
+            Handles.DrawLine(f.mTargetPos, f.mTargetPos + f.mCurvePos * 1000, 4);
+        }
+
         if (Application.isPlaying)
             return;
 
-        Transform[] WayTransforms = mMovingPlatform.GetWayTransforms();
+        Transform[] WayTransforms = me.GetWayTransforms();
         for (int i = 0; i < WayTransforms.Length; i++)
         {
             EditorGUI.BeginChangeCheck();
@@ -67,5 +77,7 @@ public class MovingPlatformEditor : Editor
             if (EditorGUI.EndChangeCheck())
                 UpdateSpline();
         }
+
+
     }
 }

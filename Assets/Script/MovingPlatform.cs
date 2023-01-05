@@ -9,6 +9,7 @@ namespace Fusion.KCC
     using System.Linq;
     using com.spacepuppy.Geom;
     using System.Collections.Generic;
+    using UnityEngine.UI;
 
     /// <summary>
     /// Basic platform which moves the object between waypoints and propagates transform changes to all KCCs within snap volume.
@@ -54,6 +55,9 @@ namespace Fusion.KCC
         private Vector3 _renderPosition;
         private RawInterpolator _entitiesInterpolator;
         public override int PositionWordOffset => 0;
+
+        [SerializeField]
+        Text[] mDebugLog;
 
         public override void Spawned()
         {
@@ -135,26 +139,29 @@ namespace Fusion.KCC
                 // Calculate next position of the platform.
                 CalculateNextPosition(_waypoint, _direction, _position, Runner.DeltaTime, out int nextWaypoint, out int nextDirection, out positionDelta, out float waitTime);
 
-                if (_mode == EPlatformMode.Curve)
+                if (true)
                 {
-
-                    if (Object.HasStateAuthority)
+                    if (_mode == EPlatformMode.Curve)
                     {
-                        if (_waitTime > 0.0f)
-                            transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
-                        else if (_waypoint != nextWaypoint)
-                            transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+
+                        if (Object.HasStateAuthority)
+                        {
+                            if (_waitTime > 0.0f)
+                                transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+                            else if (_waypoint != nextWaypoint)
+                                transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+                            else
+                                transform.eulerAngles += _waypoints[_waypoint].AngleVelocity * Runner.DeltaTime;
+
+                            _rotationDelta = _waypoints[_waypoint].AngleVelocity.y * Runner.DeltaTime;
+                            mAngle = transform.eulerAngles.y;
+                        }
                         else
-                            transform.eulerAngles += _waypoints[_waypoint].AngleVelocity * Runner.DeltaTime;
-
-                        _rotationDelta = _waypoints[_waypoint].AngleVelocity.y * Runner.DeltaTime;
-                        mAngle = transform.eulerAngles.y;
-                    }
-                    else
-                    {
-                        Vector3 aAngle = transform.eulerAngles;
-                        aAngle.y = mAngle;
-                        transform.eulerAngles = aAngle;
+                        {
+                            Vector3 aAngle = transform.eulerAngles;
+                            aAngle.y = mAngle;
+                            transform.eulerAngles = aAngle;
+                        }
                     }
                 }
 
@@ -249,8 +256,6 @@ namespace Fusion.KCC
             _rigidbody.constraints = RigidbodyConstraints.FreezeAll;
         }
 
-        // NetworkKCCProcessor INTERFACE
-
         public override float Priority => float.MaxValue;
 
         public override EKCCStages GetValidStages(KCC kcc, KCCData data)
@@ -279,6 +284,8 @@ namespace Fusion.KCC
                     PlatformEntity entity = _entities.Get(i);
                     if (entity.Id == kcc.Object.Id)
                     {
+                        // Debug.Log($"OnStay:{entity.Id}\n" + JsonUtility.ToJson(entity));
+
                         entity.Offset = data.TargetPosition - _position;
                         entity.SpaceAlpha = Mathf.Min(entity.SpaceAlpha + Runner.DeltaTime * _spaceTransitionSpeed * 2.0f, 1.0f);
 
@@ -298,6 +305,7 @@ namespace Fusion.KCC
                         entity.Id = kcc.Object.Id;
                         entity.Offset = data.TargetPosition - _position;
                         entity.SpaceAlpha = Runner.DeltaTime * _spaceTransitionSpeed + 0.001f;
+                        // Debug.Log($"OnStay2:{kcc.Object.Id}\n" + JsonUtility.ToJson(entity));
 
                         _entities.Set(i, entity);
 
@@ -328,6 +336,7 @@ namespace Fusion.KCC
                         float interpolatedSpaceAlpha = Mathf.Lerp(fromEntity.SpaceAlpha, toEntity.SpaceAlpha, alpha);
 
                         data.TargetPosition = Vector3.Lerp(data.TargetPosition, _transform.position + interpolatedOffset, interpolatedSpaceAlpha);
+                        mDebugLog[2].text = $"{kcc.Object.Id} iOffset:{Mathf.Atan2(interpolatedOffset.x, interpolatedOffset.z) * Mathf.Rad2Deg:F2}";
                     }
 
                     break;
@@ -499,20 +508,38 @@ namespace Fusion.KCC
                         KCC kcc = networkObject.GetComponent<KCC>();
                         if (kcc.IsProxy == true)
                         {
+                            mDebugLog[3].text = $"kcc.IsProxy :{kcc.Object.Id} {Object.HasStateAuthority}";
                             // Proxies are early interpolated, position delta is already applied to platform transform.
                             kcc.Interpolate();
                             continue;
                         }
 
+                        AdjustFocus aFocus;
+                        if (!mAdjustFocus.TryGetValue(kcc.Object.Id.ToString(), out aFocus))
+                        {
+                            aFocus = new AdjustFocus();
+                            mAdjustFocus.Add(kcc.Object.Id.ToString(), aFocus);
+                        }
+
+                        aFocus.mTargetPos = kcc.Data.TargetPosition;
+                        aFocus.mDeltaPos = positionDelta;
+
+                        // aFocus.mCurvePos = Vector3.zero;
+
                         if (_mode == EPlatformMode.Curve && !rotationDelta.IsAlmostZero())
                         {
-                            var aCurvePos = GetDeltaPosition(kcc.Data.BasePosition, rotationDelta);
+                            var aCurvePos = GetDeltaPosition(kcc.Data.TargetPosition + positionDelta, rotationDelta);
+
+                            mDebugLog[i].text = $"{kcc.Object.Id} pl:{Mathf.Atan2(positionDelta.x, positionDelta.z) * Mathf.Rad2Deg:F2} c:{Mathf.Atan2(aCurvePos.x, aCurvePos.z) * Mathf.Rad2Deg:F2}";
                             positionDelta = aCurvePos + positionDelta;
+
+                            aFocus.mCurvePos = aCurvePos;
                         }
+
+
 
                         KCCData kccData = kcc.Data;
                         Vector3 targetPosition = kccData.TargetPosition + positionDelta;
-
 
                         if (_snapVolume.ClosestPoint(targetPosition).AlmostEquals(targetPosition) == true)
                         {
@@ -548,8 +575,6 @@ namespace Fusion.KCC
         }
 
         Vector3[] _curvePath = null;
-        float _curveTime = 0f;
-        float _curveTotalTime = 0f;
 
         CatmullRomSpline mCatmullRomSpline = new CatmullRomSpline
         {
@@ -606,8 +631,20 @@ namespace Fusion.KCC
             PingPong = 2,
             Curve = 3
         }
-    }
 
+        Dictionary<string, AdjustFocus> mAdjustFocus = new Dictionary<string, AdjustFocus>();
+
+        public class AdjustFocus
+        {
+            public Vector3 mTargetPos;
+            public Vector3 mDeltaPos;
+            public Vector3 mCurvePos;
+        }
+        public AdjustFocus[] GetAdjustFocus()
+        {
+            return mAdjustFocus.Values.ToArray();
+        }
+    }
 
 
 }
