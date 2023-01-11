@@ -43,9 +43,9 @@ namespace Fusion.KCC
         private int _direction { get; set; }
         [Networked]
         private float _waitTime { get; set; }
-        [Networked]
         private float _rotationDelta { get; set; }
         [Networked]
+        [Accuracy(AccuracyDefaults.ROTATION)]
         float mAngle { get; set; }
         private Transform _transform;
         private Rigidbody _rigidbody;
@@ -139,30 +139,9 @@ namespace Fusion.KCC
                 // Calculate next position of the platform.
                 CalculateNextPosition(_waypoint, _direction, _position, Runner.DeltaTime, out int nextWaypoint, out int nextDirection, out positionDelta, out float waitTime);
 
-                if (true)
+                if (_mode == EPlatformMode.Curve)
                 {
-                    if (_mode == EPlatformMode.Curve)
-                    {
-
-                        if (Object.HasStateAuthority)
-                        {
-                            if (_waitTime > 0.0f)
-                                transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
-                            else if (_waypoint != nextWaypoint)
-                                transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
-                            else
-                                transform.eulerAngles += _waypoints[_waypoint].AngleVelocity * Runner.DeltaTime;
-
-                            _rotationDelta = _waypoints[_waypoint].AngleVelocity.y * Runner.DeltaTime;
-                            mAngle = transform.eulerAngles.y;
-                        }
-                        else
-                        {
-                            Vector3 aAngle = transform.eulerAngles;
-                            aAngle.y = mAngle;
-                            transform.eulerAngles = aAngle;
-                        }
-                    }
+                    CurveHandle(nextWaypoint, Runner.DeltaTime);
                 }
 
 
@@ -208,6 +187,39 @@ namespace Fusion.KCC
             ApplyPositionDelta(positionDelta, _rotationDelta);
         }
 
+        private void CurveHandle(int nextWaypoint, float iDeltaTime)
+        {
+            if (_waitTime > 0.0f)
+            {
+                _rotationDelta = Vector3.Angle(transform.eulerAngles, _waypoints[_waypoint].Transform.eulerAngles);
+
+                if (Object.HasStateAuthority)
+                    transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+            }
+            else if (_waypoint != nextWaypoint)
+            {
+                _rotationDelta = Vector3.Angle(transform.eulerAngles, _waypoints[_waypoint].Transform.eulerAngles);
+                if (Object.HasStateAuthority)
+                    transform.eulerAngles = _waypoints[_waypoint].Transform.eulerAngles;
+            }
+            else
+            {
+                if (Object.HasStateAuthority)
+                    transform.eulerAngles += _waypoints[_waypoint].AngleVelocity * Runner.DeltaTime;
+                _rotationDelta = _waypoints[_waypoint].AngleVelocity.y * Runner.DeltaTime;
+            }
+
+            if (Object.HasStateAuthority)
+                mAngle = transform.eulerAngles.y;
+
+            if (!Object.HasStateAuthority)
+            {
+                Vector3 aAngle = transform.eulerAngles;
+                aAngle.y = mAngle;
+                transform.eulerAngles = aAngle;
+            }
+        }
+
         public override void Render()
         {
             if (_waitTime > 0.0f)
@@ -219,6 +231,7 @@ namespace Fusion.KCC
             // Calculate next render position of the platform.
             // We always have to calculate delta against previous render frame to avoid clearing render changes from other sources.
             CalculateNextPosition(_renderWaypoint, _renderDirection, _renderPosition, deltaTime, out int nextWaypoint, out int nextDirection, out Vector3 positionDelta, out float waitTime);
+
             _renderTime = renderTime;
             _renderPosition += positionDelta;
             _renderWaypoint = nextWaypoint;
@@ -493,6 +506,8 @@ namespace Fusion.KCC
             if (positionDelta.IsZero() == true)
                 return;
 
+            // Debug.Log($"<color=red>ApplyPositionDelta:</color>{positionDelta:f3}   {rotationDelta:f3}");
+
             // Valid only for entities within snap volume.
             // We need to apply the position delta immediately before any KCC runs its update.
             // Otherwise KCCs would collide with colliders positioned at previous update.
@@ -524,9 +539,10 @@ namespace Fusion.KCC
                         aFocus.mTargetPos = kcc.Data.TargetPosition;
                         aFocus.mDeltaPos = positionDelta;
 
-                        // aFocus.mCurvePos = Vector3.zero;
+                        // mDebugLog[i].text = $"{kcc.Object.Id} IsProxy:{kcc.IsProxy} S:{kcc.HasStateAuthority} I:{kcc.HasInputAuthority}";
 
-                        if (_mode == EPlatformMode.Curve && !rotationDelta.IsAlmostZero())
+                        // aFocus.mCurvePos = Vector3.zero;
+                        if (_mode == EPlatformMode.Curve && !rotationDelta.IsAlmostZero(0.001f))
                         {
                             var aCurvePos = GetDeltaPosition(kcc.Data.TargetPosition + positionDelta, rotationDelta);
 
@@ -535,8 +551,6 @@ namespace Fusion.KCC
 
                             aFocus.mCurvePos = aCurvePos;
                         }
-
-
 
                         KCCData kccData = kcc.Data;
                         Vector3 targetPosition = kccData.TargetPosition + positionDelta;
@@ -549,7 +563,6 @@ namespace Fusion.KCC
 
                             // Just applying position delta to KCCData is not enough.
                             // The change must be immediately propagated to Transform and Rigidbody as well.
-
                             kcc.SynchronizeTransform(true, false);
                         }
                     }
